@@ -20,10 +20,23 @@ class Trend
     public Carbon $end;
 
     public string $dateColumn = 'created_at';
+    
+    public bool $applyBetweenToQuery = true; //change
 
     public function __construct(public Builder $builder)
     {
     }
+    
+       /**
+     * @param bool $applyBetween
+     * @return Trend
+     */
+    public function setApplyBetweenToQuery(bool $applyBetween): Trend
+    {
+        $this->applyBetweenToQuery = $applyBetween;
+        return $this;
+    } //change
+
 
     public static function query(Builder $builder): self
     {
@@ -90,10 +103,14 @@ class Trend
                 {$this->getSqlDate()} as date,
                 {$aggregate}({$column}) as aggregate
             ")
-            ->whereBetween($this->dateColumn, [$this->start, $this->end])
+             ->when($this->applyBetweenToQuery, function ($query, $role){
+                $query->whereBetween($this->dateColumn, [$this->start, $this>end]);
+            })  //change
             ->groupBy('date')
             ->orderBy('date')
             ->get();
+        
+          $values =  is_array($values) ?  collect($values) : $values; //change
 
         return $this->mapValuesToDates($values);
     }
@@ -126,8 +143,8 @@ class Trend
     public function mapValuesToDates(Collection $values): Collection
     {
         $values = $values->map(fn ($value) => new TrendValue(
-            date: $value->date,
-            aggregate: $value->aggregate,
+            date: $value->date ?? $value['date'], //change,
+            aggregate: $value->aggregate ?? $value['aggregate'] //change,
         ));
 
         $placeholders = $this->getDatePeriod()->map(
@@ -160,6 +177,7 @@ class Trend
             'mysql' => new MySqlAdapter(),
             'sqlite' => new SqliteAdapter(),
             'pgsql' => new PgsqlAdapter(),
+             'bavix::clickhouse::custom' => new ClickHouseAdapter(), //change
             default => throw new Error('Unsupported database driver.'),
         };
 
